@@ -6,49 +6,36 @@ from pathlib import Path
 import fitz  # PyMuPDF
 import streamlit as st
 
-st.set_page_config(page_title="CDBL BOID Portfolio Separator", page_icon="📄", layout="wide")
+st.set_page_config(page_title="CDBL BOID Separator for Portfolio and Statement", page_icon="📄", layout="wide")
 
-st.title("CDBL BOID Portfolio Separator")
+st.title("CDBL BOID Separator for Portfolio and Statement")
 st.write(
-    "Upload DPD1 account statements and/or DPA6 Daily BO-ISIN Holding Reports. "
+    "Upload DPD1/CDA4/CD49 account statements and/or DPA6 Daily BO-ISIN Holding Reports. "
     "The app separates pages by BOID, lists missing BOIDs, and creates TXT reports."
 )
 
-DPD1_DEFAULT = """1202950018995403
-1201900021719463
-1202900021719463"""
-
-DPA6_DEFAULT = """1201530000002341
-1604580000002341
-1201530000003518
-1201530000003534
-1604580000003534
-1201530061471934
-1201530061471926
-1201530000003577
-1604580000003577
-1201530062162908
-1201530062162892
-1201530000003569
-1604580000003569
-1201530062008338
-1201530062008321
-1201530000003542
-1604580000003542
-1201530061740096
-1201530061740152
-1605420073358281
-1201530000003501
-1301000000056063
-1604580023518711
-1605400047188717"""
+# Clear the BOID inputs on the first page load and after each completed run.
+# This flag is handled before the widgets are created on the next rerun.
+if st.session_state.pop("cdbl_clear_boid_inputs", False):
+    st.session_state["dpd1_boid_input"] = ""
+    st.session_state["dpa6_boid_input"] = ""
 
 st.subheader("1. BOID lists")
 left, right = st.columns(2)
 with left:
-    dpd1_text = st.text_area("DPD1 BOIDs (one per line)", DPD1_DEFAULT, height=180)
+    dpd1_text = st.text_area(
+        "DPD1/CDA4/CD49 BOIDs (one per line)",
+        value="",
+        height=180,
+        key="dpd1_boid_input",
+    )
 with right:
-    dpa6_text = st.text_area("DPA6 BOIDs (one per line)", DPA6_DEFAULT, height=360)
+    dpa6_text = st.text_area(
+        "DPA6 BOIDs (one per line)",
+        value="",
+        height=360,
+        key="dpa6_boid_input",
+    )
 
 dpd1_targets = list(dict.fromkeys(re.findall(r"(?<!\d)\d{16}(?!\d)", dpd1_text)))
 dpa6_targets = list(dict.fromkeys(re.findall(r"(?<!\d)\d{16}(?!\d)", dpa6_text)))
@@ -63,7 +50,7 @@ report_choice = st.selectbox(
 
 st.subheader("2. Upload PDF files")
 uploads = st.file_uploader(
-    "Select one or more DPD1 / DPA6 PDF files",
+    "Select one or more DPD1/CDA4/CD49 or DPA6 PDF files",
     type=["pdf"],
     accept_multiple_files=True,
 )
@@ -238,6 +225,10 @@ if uploads and all_targets:
         for source_name, pages in unidentified_by_file.items():
             combined.append(f"{source_name}: " + (", ".join(map(str, pages)) if pages else "None"))
         st.session_state["cdbl_output_files"]["COMBINED_MISSING_BOID_REPORT.txt"] = "\n".join(combined).encode("utf-8")
+
+        # Clear both BOID boxes after processing while retaining generated results.
+        st.session_state["cdbl_clear_boid_inputs"] = True
+        st.rerun()
 
 if "cdbl_summary_rows" in st.session_state:
     st.subheader("3. Separation results")
